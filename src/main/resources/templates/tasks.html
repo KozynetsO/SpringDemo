@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task Manager</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link th:href="@{/styles/css/tasks.css}" rel="stylesheet"/>
+    <meta name="_csrf" th:content="${_csrf.token}" />
+    <meta name="_csrf_header" th:content="${_csrf.headerName}" />
+</head>
+<body>
+<div class="container mt-5">
+    <div class="welcome-container">
+        <div class="dropdown">
+            <span class="welcome-message dropdown-toggle" id="dropdownMenuButton" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                Welcome, <span sec:authentication="name"></span>
+            </span>
+            <div class="dropdown-menu" aria-labelledby="dropdownMenuButton">
+                <form class="logout-form" th:action="@{/logout}" method="post">
+                    <a class="dropdown-item logout-link" href="#" onclick="document.querySelector('.logout-form').submit()">Sign Out</a>
+                </form>
+            </div>
+        </div>
+    </div>
+    <h1 class="text-center">Task Manager</h1>
+    <div class="card">
+        <div class="card-header">
+            <button class="btn btn-success float-left" onclick="showAddTaskForm()">Add Task</button>
+            <button class="btn btn-success float-right" onclick="loadTasks()">Refresh Tasks</button>
+        </div>
+        <div class="card-body">
+            <form id="new-task-form" class="mb-4" style="display: none;">
+                <div class="form-group">
+                    <label for="taskTitle">Title</label>
+                    <input type="text" class="form-control" id="taskTitle" name="title" required>
+                </div>
+                <div class="form-group">
+                    <label for="taskDescription">Description</label>
+                    <input type="text" class="form-control" id="taskDescription" name="description" required>
+                </div>
+                <div class="form-group">
+                    <label for="taskPriority">Priority</label>
+                    <select class="form-control" id="taskPriority" name="priority" required>
+                        <option th:each="priority : ${T(com.example.demo.utils.Priority).values()}"
+                                th:value="${priority}" th:text="${#strings.capitalize(priority.toString().toLowerCase())}"></option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="taskDueDate">Due Date</label>
+                    <input type="date" class="form-control" id="taskDueDate" name="dueDate" required>
+                </div>
+                <button type="submit" class="btn btn-success">Add Task</button>
+                <button type="button" class="btn btn-secondary" onclick="hideAddTaskForm()">Cancel</button>
+            </form>
+            <div class="filter">
+                <label for="priorityFilter">Priority filter:</label>
+                <select id="priorityFilter" name="priority" required onclick="loadTasks()">
+                    <option>None</option>
+                    <option th:each="priority : ${T(com.example.demo.utils.Priority).values()}"
+                            th:value="${priority}" th:text="${#strings.capitalize(priority.toString().toLowerCase())}"></option>
+                </select>
+            </div>
+            <div id="task-container"></div>
+        </div>
+    </div>
+</div>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.11.0/umd/popper.min.js"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta/js/bootstrap.min.js"></script>
+<script>
+    function showAddTaskForm() {
+        $('#new-task-form').show();
+    }
+
+    function hideAddTaskForm() {
+        $('#new-task-form').hide();
+        $('#new-task-form')[0].reset();
+    }
+
+    $('#new-task-form').on('submit', function(event) {
+        event.preventDefault();
+        var formData = {
+            title: $('#taskTitle').val(),
+            description: $('#taskDescription').val(),
+            priority: $('#taskPriority').val(),
+            dueDate: $('#taskDueDate').val()
+        };
+
+        var csrfToken = $("meta[name='_csrf']").attr("content");
+        var csrfHeader = $("meta[name='_csrf_header']").attr("content");
+
+        $.ajax({
+            url: '/api/tasks/add',
+            method: 'POST',
+            data: JSON.stringify(formData),
+            contentType: "application/json; charset=utf-8",
+            beforeSend: function(xhr) {
+                xhr.setRequestHeader(csrfHeader, csrfToken);
+            },
+            success: function() {
+                hideAddTaskForm();
+                loadTasks();
+            },
+            error: function(error) {
+                console.error("Error adding task: ", error);
+            }
+        });
+    });
+
+    function loadTasks() {
+        var priority = $('#priorityFilter').val();
+        var requestData = {};
+
+        if (priority !== "None") {
+            requestData = { priority: priority };
+        }
+
+        $.ajax({
+            url: '/api/tasks',
+            method: 'GET',
+            data: requestData,
+            success: function(data) {
+                var taskContainer = $('#task-container');
+                taskContainer.empty();
+
+                data.sort(function(a, b) {
+                    return a.id - b.id;
+                });
+
+                data.forEach(function(task) {
+                    var taskElement = `<div class="task card mb-3 ${task.completed ? 'completed-task' : ''}">
+                            <div class="card-body">
+                                <h5 class="card-title">${task.title}</h5>
+                                <p class="card-text">${task.description}</p>
+                                <div class="priority-container">
+                                    <label for="priority-${task.id}">Priority:</label>
+                                    <select id="priority-${task.id}" class="form-control" onchange="changePriority(${task.id}, this.value)">
+                                        <option value="LOW" ${task.priority === 'LOW' ? 'selected' : ''}>Low</option>
+                                        <option value="MEDIUM" ${task.priority === 'MEDIUM' ? 'selected' : ''}>Medium</option>
+                                        <option value="HIGH" ${task.priority === 'HIGH' ? 'selected' : ''}>High</option>
+                                    </select>
+                                </div>
+                                <p class="card-text"><small class="text-muted">Due Date: ${task.dueDate}</small></p>
+                                <button class="btn ${task.completed ? 'btn-secondary' : 'btn-success'}" onclick="changeStatus(${task.id}, '${task.completed ? 'reopen' : 'complete'}')">${task.completed ? 'Re-open' : 'Complete'}</button>
+                                <button class="btn btn-danger" onclick="deleteTask(${task.id})">Delete</button>
+                            </div>
+                        </div>`;
+                    taskContainer.append(taskElement);
+                });
+            },
+            error: function(error) {
+                console.error("Error loading tasks: ", error);
+            }
+        });
+    }
+
+    function changeStatus(taskId, action) {
+        var csrfToken = $("meta[name='_csrf']").attr("content");
+        var csrfHeader = $("meta[name='_csrf_header']").attr("content");
+
+        $.ajax({
+            url: `/api/tasks/changeStatus/${taskId}`,
+            method: 'POST',
+            beforeSend: function(xhr) {
+                xhr.setRequestHeader(csrfHeader, csrfToken);
+            },
+            success: function() {
+                loadTasks();
+            },
+            error: function(error) {
+                console.error(`Error ${action === 'complete' ? 'completing' : 'reopening'} task: `, error);
+            }
+        });
+    }
+
+    function changePriority(taskId, priority) {
+        var csrfToken = $("meta[name='_csrf']").attr("content");
+        var csrfHeader = $("meta[name='_csrf_header']").attr("content");
+
+        $.ajax({
+            url: `/api/tasks/changePriority/${taskId}`,
+            method: 'POST',
+            data: { priority: priority },
+            beforeSend: function(xhr) {
+                xhr.setRequestHeader(csrfHeader, csrfToken);
+            },
+            success: function() {
+                loadTasks();
+            },
+            error: function(error) {
+                console.error("Error changing priority: ", error);
+            }
+        });
+    }
+
+    function deleteTask(taskId) {
+        var csrfToken = $("meta[name='_csrf']").attr("content");
+        var csrfHeader = $("meta[name='_csrf_header']").attr("content");
+
+        $.ajax({
+            url: `/api/tasks/${taskId}`,
+            method: 'DELETE',
+            beforeSend: function(xhr) {
+                xhr.setRequestHeader(csrfHeader, csrfToken);
+            },
+            success: function() {
+                loadTasks();
+            },
+            error: function(error) {
+                console.error("Error deleting task: ", error);
+            }
+        });
+    }
+
+    $(document).ready(function() {
+        loadTasks();
+    });
+</script>
+</body>
+</html>

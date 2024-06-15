@@ -1,0 +1,56 @@
+body {
+    background-color: #f8f9fa;
+}
+
+.card {
+    margin-top: 20px;
+}
+
+.card-header h3 {
+    margin: 0;
+}
+
+.task {
+    margin-bottom: 10px;
+}
+
+.welcome-container {
+    text-align: right;
+    margin-bottom: 10px;
+}
+
+.welcome-message {
+    font-size: 16px;
+    color: #555;
+    margin-right: 10px;
+    cursor: pointer;
+}
+
+.logout-link {
+    color: #007bff;
+    text-decoration: none;
+    transition: color 0.3s ease;
+}
+
+.logout-link:hover {
+    color: #0056b3;
+    text-decoration: underline;
+}
+
+.completed-task {
+    background-color: #f2f2f2;
+}
+.priority-container {
+    display: flex;
+    align-items: center;
+}
+.priority-container label {
+    margin-right: 10px;
+}
+.priority-container select {
+    width: auto;
+
+    padding: 0.375rem;
+    font-size: inherit;
+    line-height: inherit;
+}
